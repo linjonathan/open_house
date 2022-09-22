@@ -1,26 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="shortcut icon" href="#" />
+
 <head>
-    <meta charset="UTF-8">
-    <title>hurricanes</title>
-    <link rel="stylesheet" href="css/style.css">
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Hurricanes</title>
+  <meta name="description" content="">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
-   <h1>Welcome to hurricanes</h1>
-   <form action = /name method="POST">
-        <label for="name">Name:</label>
-        <input type="text" name="name" id="name" size="15">
-        <input type="submit" name="submit" id="submit"/>
-   </form>
-   <form action = /date method="POST">
-        <label for="birthday">Birthday:</label>
-        <input type="date" name="date" id = "date">
-        <input type="submit" name="submit" id="submit"/>
-   </form>
+  <div class="topnav">
+    <div id="header">Hurricanes </div>
+  </div><br/>
 
-
-  <p><strong>{{ h_name }}</strong></p>
-  <img src="data:image/jpeg;base64,{{ img_data }}" alt="img_data" id="imgslot"/>
+  <div id = "inputs">
+    <form action = /name method="POST" >
+      <label for="name">Name:</label>
+      <input type="text" name="name" id="name" size="15">
+      <input type="submit" name="submit" id="submit"/>
+    </form>
+  </div>
+  <div id = "inputs">
+    <form action = /date method="POST">
+      <label for="birthday">Birthday:</label>
+      <input type="date" name="date" id = "date">
+      <input type="submit" name="submit" id="submit"/>
+    </form>
+  </div>
+  <br>
+  <div id = "outputs"><p><strong>{{ h_name }}</strong></p></div>
+  <img class = "imgs" src="data:image/jpeg;base64,{{ img_data }}" alt="img_data" id="imgslot"/>
 
 </body>
 </html>

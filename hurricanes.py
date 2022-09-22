@@ -74,7 +74,7 @@ def name():
         new_image_string = base64.b64encode(buf.getvalue()).decode("utf-8")
         return render_template('figure.html', img_data=new_image_string, h_name = r_name)
     else:
-        return render_template('index.html', img_data='')
+        return render_template('result.html', img_data='', h_name = 'No hurricanes found :(')
 
 @app.route('/date', methods=['POST'])
 def date():
