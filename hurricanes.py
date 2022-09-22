@@ -80,17 +80,17 @@ def name():
 def date():
     fn_ib = 'IBTrACS.NA.v04r00.nc'
     ds_ib = xr.open_dataset(fn_ib)
-    names = ds_ib['name'].data.astype('str')
+    names = ds_ib['name'].load().data.astype('str')
 
     try:
         r_date = request.form['date'].upper()
         r_date = datetime.datetime.strptime(r_date, '%Y-%m-%d')
     except:
         return render_template('result.html', img_data='', h_name = 'No hurricanes found :(')
-
-    null_mask = ~pd.isnull(ds_ib['time'].data)
-    dts = [datetime.datetime.utcfromtimestamp(int(x)/1e9) for x in np.array(ds_ib['time'].data[null_mask])]
-    dt = np.full(ds_ib['time'].shape, datetime.datetime(2100, 1, 1))
+    time = ds_ib['time'].load()
+    null_mask = ~pd.isnull(time.data)
+    dts = [datetime.datetime.utcfromtimestamp(int(x)/1e9) for x in np.array(time.data[null_mask])]
+    dt = np.full(time.shape, datetime.datetime(2100, 1, 1))
     dt[null_mask] = dts
     tcs_close = np.abs(dt - r_date) <= datetime.timedelta(hours = 24)
     idxs = np.argwhere(np.any(tcs_close, axis = 1)).flatten()
@@ -98,8 +98,8 @@ def date():
     if len(idxs) >= 0:
         lon_min = 260; lon_max = 360;
         lat_min = 0; lat_max = 60;
-        lon = ds_ib['lon'][idxs, :].data
-        lat = ds_ib['lat'][idxs, :].data
+        lon = ds_ib['lon'][idxs, :].load().data
+        lat = ds_ib['lat'][idxs, :].load().data
 
         lon_cen = 0
         dlon_label = 20
