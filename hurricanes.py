@@ -12,6 +12,8 @@ import numpy as np
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER, LatitudeLocator
 import pandas as pd
 import namelist
+from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColormap
+from matplotlib.collections import LineCollection
 
 app = Flask(__name__)
 
@@ -19,8 +21,14 @@ app = Flask(__name__)
 def index():
     return render_template('index.html', img_data='')
 
-def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names):
+def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
+                lon_syn_tc, lat_syn_tc, basin_syn_tc, vmax_syn_tc):
     matplotlib.rcParams.update({'font.size': 15})
+    colors = np.asarray([(77, 166, 176), (82, 184, 81), (245, 213, 56),
+              (245, 176, 56), (245, 135, 56), (196, 87, 57), (171, 3, 3)]) / 255
+    wnd_cmap = LinearSegmentedColormap.from_list('wnd', colors, N=7)
+    norm = BoundaryNorm([0, 33, 65, 84, 96, 114, 135, 160, 999], wnd_cmap.N)
+
     lon_min = 0; lon_max = 359.99
     lat_min = -60.1; lat_max = 60.1
     dlon_label = 30
@@ -30,7 +38,7 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names):
     xlocs_shift = np.copy(xlocs)
     xlocs_shift[xlocs > 180] -= 360
 
-    fig = Figure(figsize=(21,15))
+    fig = plt.figure(figsize=(21,15))
     ax = fig.subplots()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -48,7 +56,7 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names):
     gl = ax.gridlines(draw_labels=True, crs=ccrs.PlateCarree(), xlocs=xlocs_shift,
                       color='gray', alpha=0.3)
     gl.bottom_labels = True
-    gl.top_labels = False
+    gl.xlabels_top = False
     gl.left_labels = True
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
@@ -57,9 +65,15 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names):
     lon_tc_b = np.copy(lon_tc)
     lon_tc_b += 180
     lon_tc_b[lon_tc_b >= 180] = lon_tc_b[lon_tc_b >= 180] - 360
-    ax.plot(lon_tc_b.T, lat_tc.T, linewidth = 3)
     for k in range(len(tc_names)):
-        ax.text(lon_tc_b[k, 0], lat_tc[k, 0] - 4, tc_names[k],
+        points = np.array([lon_tc_b[k, :], lat_tc[k, :]]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+        lc = LineCollection(segments, cmap=wnd_cmap, norm=norm)
+        lc.set_array(vmax_tc[k, :])
+        lc.set_linewidth(5)
+        line = ax.add_collection(lc)
+        #ax.plot(lon_tc_b[k, :], lat_tc[k, :], linewidth = 3)
+        ax.text(lon_tc_b[k, 0], lat_tc[k, 0] - 6, tc_names[k],
                 {'size': 13, 'ha': 'left', 'backgroundcolor': [0.5, 0.5, 0.5, 0.8]})
     ax.set_title('Historical Tropical Cyclones')
 
@@ -87,9 +101,28 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names):
 
         # Plot tracks for each individual basin.
         b_mask = basin_tc == basins[j]
-        ax.plot(lon_tc[b_mask, :].T, lat_tc[b_mask, :].T, linewidth = 3)
+        for k in range(np.sum(b_mask)):
+            points = np.array([lon_tc[b_mask, :][k, :], lat_tc[b_mask, :][k, :]]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            lc = LineCollection(segments, cmap=wnd_cmap, norm=norm)
+            lc.set_array(vmax_tc[b_mask, :][k, :])
+            lc.set_linewidth(5)
+            line = ax.add_collection(lc)
 
+        # Plot synthetic tracks for each individual basin.
+        b_idxs = np.argwhere(basin_syn_tc == basins[j]).flatten()
+        if len(b_idxs) > 0:
+            b_idx = b_idxs[0]
+            points = np.array([lon_syn_tc[b_idx, :], lat_syn_tc[b_idx, :]]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            lc = LineCollection(segments, cmap=wnd_cmap, norm=norm)
+            lc.set_array(vmax_syn_tc[b_idx, :])
+            lc.set_linewidth(5)
+            line = ax.add_collection(lc)
+    #import matplotlib.pyplot as plt
     #fig.tight_layout()
+    plt.show()
+    # %%
     return fig
 
 @app.route('/name', methods=['POST'])
@@ -134,6 +167,28 @@ def date():
         r_date = datetime.datetime.strptime(r_date, '%Y-%m-%d')
     except:
         return render_template('result.html', img_data='', h_name = 'No hurricanes found :(')
+
+    #ds_ipsl = xr.open_dataset('/home/clee/test/open_house/IPSL-CM6A-LR_openhouse.nc')
+    ds_cesm = xr.open_dataset('/home/clee/test/open_house/CESM2_openhouse.nc')
+
+    # For synthetic tracks, select a random year between 1951 and 2100
+    # Use the month and day of the actual birthday.
+    year_syn = np.random.randint(1951, 2101)
+    cesm_mask = np.logical_and(ds_cesm['year'][0, :].data == year_syn,
+                               ds_cesm['month'][0, :].data == r_date.month,
+                               ds_cesm['day'][0, :].data == r_date.day)
+    # 1 is Atlantic, 2 is eastern Pacific, 3 is western Pacific, 4 is northern
+    # Indian Ocean, 5 is southern Indian Ocean, 6 is Australia, 7 is southern Pacific.
+    basin_num_date = ds_cesm['basin'][0, cesm_mask].data
+    basin_id_date = np.full(np.sum(cesm_mask), '').astype('object')
+    basin_id_date[basin_num_date == 1] = 'NA'
+    basin_id_date[basin_num_date == 2] = 'EP'
+    basin_id_date[basin_num_date == 3] = 'WP'
+    basin_id_date[basin_num_date == 4] = 'NI'
+    basin_id_date[basin_num_date == 5] = 'SI'
+    basin_id_date[basin_num_date == 6] = 'SP'
+    basin_id_date[basin_num_date == 7] = 'SP'
+
     time = ds_ib['time'].load()
     null_mask = ~pd.isnull(time.data)
     dts = [datetime.datetime.utcfromtimestamp(int(x)/1e9) for x in np.array(time.data[null_mask])]
@@ -147,7 +202,28 @@ def date():
         lat_tc = ds_ib['lat'][idxs, :].load().data
         basin_tc = basins[idxs]
         tc_names = names[idxs]
-        fig = plot_tracks(lon_tc, lat_tc, basin_tc, tc_names)
+        vmax_tc = ds_ib['usa_wind'][idxs, :].load().data
+
+        # Synthetic tracks
+        lon_syn_tc = []; lat_syn_tc = [];
+        basin_syn_tc = []; vmax_syn_tc = [];
+        for k in range(1, 8):
+            idxs_syn_b = np.argwhere(basin_num_date == k).flatten()
+            if len(idxs_syn_b) > 0:
+                idx_syn_b = np.random.choice(idxs_syn_b)
+                lon_fac = 0
+                if basin_id_date[idx_syn_b] == 'NA' or basin_id_date[idx_syn_b] == 'EP':
+                    lon_fac = -360
+                lon_syn_tc.append(ds_cesm['longitude'][:, cesm_mask][:, idx_syn_b].data + lon_fac)
+                lat_syn_tc.append(ds_cesm['latitude'][:, cesm_mask][:, idx_syn_b].data)
+                basin_syn_tc.append(basin_id_date[idx_syn_b])
+                vmax_syn_tc.append(ds_cesm['Mwspd'][:, cesm_mask][:, idx_syn_b].data)
+        lon_syn_tc = np.array(lon_syn_tc)
+        lat_syn_tc = np.array(lat_syn_tc)
+        basin_syn_tc = np.array(basin_syn_tc)
+        vmax_syn_tc = np.array(vmax_syn_tc)
+        fig = plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
+                          lon_syn_tc, lat_syn_tc, basin_syn_tc, vmax_syn_tc)
 
         # Save it to a temporary buffer.
         buf = BytesIO()
