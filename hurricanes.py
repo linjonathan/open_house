@@ -27,7 +27,7 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
     colors = np.asarray([(77, 166, 176), (82, 184, 81), (245, 213, 56),
               (245, 176, 56), (245, 135, 56), (196, 87, 57), (171, 3, 3)]) / 255
     wnd_cmap = LinearSegmentedColormap.from_list('wnd', colors, N=7)
-    norm = BoundaryNorm([0, 33, 65, 84, 96, 114, 135, 160, 999], wnd_cmap.N)
+    norm = BoundaryNorm([0, 33, 65, 84, 96, 114, 135, 180], wnd_cmap.N)
 
     lon_min = 0; lon_max = 359.99
     lat_min = -60.1; lat_max = 60.1
@@ -38,7 +38,7 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
     xlocs_shift = np.copy(xlocs)
     xlocs_shift[xlocs > 180] -= 360
 
-    fig = plt.figure(figsize=(21,15))
+    fig = Figure(figsize=(21,15))
     ax = fig.subplots()
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -72,7 +72,6 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
         lc.set_array(vmax_tc[k, :])
         lc.set_linewidth(5)
         line = ax.add_collection(lc)
-        #ax.plot(lon_tc_b[k, :], lat_tc[k, :], linewidth = 3)
         ax.text(lon_tc_b[k, 0], lat_tc[k, 0] - 6, tc_names[k],
                 {'size': 13, 'ha': 'left', 'backgroundcolor': [0.5, 0.5, 0.5, 0.8]})
     ax.set_title('Historical Tropical Cyclones')
@@ -119,10 +118,8 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
             lc.set_array(vmax_syn_tc[b_idx, :])
             lc.set_linewidth(5)
             line = ax.add_collection(lc)
-    #import matplotlib.pyplot as plt
-    #fig.tight_layout()
-    plt.show()
-    # %%
+            ax.scatter(lon_syn_tc[b_idx, 0], lat_syn_tc[b_idx, 0], s = 60, c = 'k')
+
     return fig
 
 @app.route('/name', methods=['POST'])
