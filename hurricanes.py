@@ -22,7 +22,7 @@ def index():
     return render_template('index.html', img_data='')
 
 def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
-                lon_syn_tc, lat_syn_tc, basin_syn_tc, vmax_syn_tc):
+                lon_syn_tc, lat_syn_tc, basin_syn_tc, vmax_syn_tc,title_name):
     matplotlib.rcParams.update({'font.size': 15})
     colors = np.asarray([(77, 166, 176), (82, 184, 81), (245, 213, 56),
               (245, 176, 56), (245, 135, 56), (196, 87, 57), (171, 3, 3)]) / 255
@@ -74,7 +74,7 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
         line = ax.add_collection(lc)
         ax.text(lon_tc_b[k, 0], lat_tc[k, 0] - 6, tc_names[k],
                 {'size': 13, 'ha': 'left', 'backgroundcolor': [0.5, 0.5, 0.5, 0.8]})
-    ax.set_title('Historical Tropical Cyclones')
+    ax.set_title('Historical Tropical Cyclones: '+title_name)
 
     # Plot the six basins
     basins = ['NI', 'WP', 'EP', 'SI', 'SP', 'NA']
@@ -138,7 +138,14 @@ def name():
             lat_tc = ds_ib['lat'][idxs, :].load().data
             basin_tc = basins[idxs]
             tc_names = names[idxs]
-            fig = plot_tracks(lon_tc, lat_tc, basin_tc, tc_names)
+            vmax_tc = ds_ib['usa_wind'][idxs, :].load().data
+            lon_syn_tc =np.array([])
+            lat_syn_tc = np.array([])
+            basin_syn_t = np.array([])
+            vmax_syn_tc = np.array([]) 
+            fig = plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
+                  lon_syn_tc, lat_syn_tc, basin_syn_t, vmax_syn_tc,r_name)
+
 
         # Save it to a temporary buffer.
         buf = BytesIO()
@@ -194,33 +201,39 @@ def date():
     tcs_close = np.abs(dt - r_date) <= datetime.timedelta(hours = 24)
     idxs = np.argwhere(np.any(tcs_close, axis = 1)).flatten()
 
-    if len(idxs) >= 0:
+    if len(idxs) > 0:
         lon_tc = ds_ib['lon'][idxs, :].load().data
         lat_tc = ds_ib['lat'][idxs, :].load().data
         basin_tc = basins[idxs]
         tc_names = names[idxs]
         vmax_tc = ds_ib['usa_wind'][idxs, :].load().data
-
-        # Synthetic tracks
-        lon_syn_tc = []; lat_syn_tc = [];
-        basin_syn_tc = []; vmax_syn_tc = [];
-        for k in range(1, 8):
-            idxs_syn_b = np.argwhere(basin_num_date == k).flatten()
-            if len(idxs_syn_b) > 0:
-                idx_syn_b = np.random.choice(idxs_syn_b)
-                lon_fac = 0
-                if basin_id_date[idx_syn_b] == 'NA' or basin_id_date[idx_syn_b] == 'EP':
-                    lon_fac = -360
-                lon_syn_tc.append(ds_cesm['longitude'][:, cesm_mask][:, idx_syn_b].data + lon_fac)
-                lat_syn_tc.append(ds_cesm['latitude'][:, cesm_mask][:, idx_syn_b].data)
-                basin_syn_tc.append(basin_id_date[idx_syn_b])
-                vmax_syn_tc.append(ds_cesm['Mwspd'][:, cesm_mask][:, idx_syn_b].data)
-        lon_syn_tc = np.array(lon_syn_tc)
-        lat_syn_tc = np.array(lat_syn_tc)
-        basin_syn_tc = np.array(basin_syn_tc)
-        vmax_syn_tc = np.array(vmax_syn_tc)
+    else:
+        lon_tc = np.array([])
+        lat_tc = np.array([])
+        basin_tc = np.array([])
+        tc_names = np.array([])
+        vmax_tc = np.array([])
+    # Synthetic tracks
+    lon_syn_tc = []; lat_syn_tc = [];
+    basin_syn_tc = []; vmax_syn_tc = [];
+    for k in range(1, 8):
+        idxs_syn_b = np.argwhere(basin_num_date == k).flatten()
+        if len(idxs_syn_b) > 0:
+            idx_syn_b = np.random.choice(idxs_syn_b)
+            lon_fac = 0
+            if basin_id_date[idx_syn_b] == 'NA' or basin_id_date[idx_syn_b] == 'EP':
+                lon_fac = -360
+            lon_syn_tc.append(ds_cesm['longitude'][:, cesm_mask][:, idx_syn_b].data + lon_fac)
+            lat_syn_tc.append(ds_cesm['latitude'][:, cesm_mask][:, idx_syn_b].data)
+            basin_syn_tc.append(basin_id_date[idx_syn_b])
+            vmax_syn_tc.append(ds_cesm['Mwspd'][:, cesm_mask][:, idx_syn_b].data)
+    lon_syn_tc = np.array(lon_syn_tc)
+    lat_syn_tc = np.array(lat_syn_tc)
+    basin_syn_tc = np.array(basin_syn_tc)
+    vmax_syn_tc = np.array(vmax_syn_tc)
+    if len(idxs) >= 0 :
         fig = plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
-                          lon_syn_tc, lat_syn_tc, basin_syn_tc, vmax_syn_tc)
+                      lon_syn_tc, lat_syn_tc, basin_syn_tc, vmax_syn_tc,str(r_date).split(' ')[0])
 
         # Save it to a temporary buffer.
         buf = BytesIO()
