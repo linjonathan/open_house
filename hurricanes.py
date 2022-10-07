@@ -72,7 +72,10 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
         lc.set_array(vmax_tc[k, :])
         lc.set_linewidth(5)
         line = ax.add_collection(lc)
-        ax.text(lon_tc_b[k, 0], lat_tc[k, 0] - 6, tc_names[k],
+        lat_offset = -5
+        if lat_tc[k, 0] < 0:
+            lat_offset = 4
+        ax.text(lon_tc_b[k, 0], lat_tc[k, 0] + lat_offset, tc_names[k],
                 {'size': 13, 'ha': 'left', 'backgroundcolor': [0.5, 0.5, 0.5, 0.8]})
     ax.set_title('Historical Tropical Cyclones: '+title_name)
 
@@ -158,7 +161,6 @@ def name():
         valid_mask = ~np.all(np.isnan(vmax_tc), axis = 1)
         if np.sum(idxs) > 0:
             idxs = np.argwhere(idxs).flatten()[valid_mask]
-            print(idxs)
             lon_tc = ds_ib['lon'][idxs, :].load().data
             lat_tc = ds_ib['lat'][idxs, :].load().data
             basin_tc = basins[idxs]
@@ -169,7 +171,6 @@ def name():
                     nans, x = nan_helper(vmax_tc[jdx, :])
                     vmax_tc[jdx, nans] = np.interp(x(nans), x(~nans), vmax_tc[jdx, ~nans])
                     #vmax_tc[jdx, np.isnan(lon_tc[jdx, :])] = np.nan
-            print(basin_tc)
             lon_syn_tc = np.array([])
             lat_syn_tc = np.array([])
             basin_syn_t = np.array([])
@@ -232,13 +233,21 @@ def date():
     dt[null_mask] = dts
     tcs_close = np.abs(dt - r_date) <= datetime.timedelta(hours = 24)
     idxs = np.argwhere(np.any(tcs_close, axis = 1)).flatten()
-
+    if len(idxs) > 0:
+        vmax_tc = ds_ib['wmo_wind'][idxs, :].load().data
+        valid_mask = ~np.all(np.isnan(vmax_tc), axis = 1)
+        idxs = idxs[valid_mask]
+    
     if len(idxs) > 0:
         lon_tc = ds_ib['lon'][idxs, :].load().data
         lat_tc = ds_ib['lat'][idxs, :].load().data
         basin_tc = basins[idxs]
         tc_names = names[idxs]
         vmax_tc = ds_ib['wmo_wind'][idxs, :].load().data
+        for jdx in range(len(idxs)):
+            if np.any(np.isnan(vmax_tc[jdx, :])):
+                nans, x = nan_helper(vmax_tc[jdx, :])
+                vmax_tc[jdx, nans] = np.interp(x(nans), x(~nans), vmax_tc[jdx, ~nans])
     else:
         lon_tc = np.array([])
         lat_tc = np.array([])
