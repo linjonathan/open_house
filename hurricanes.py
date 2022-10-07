@@ -122,6 +122,23 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
 
     return fig
 
+def nan_helper(y):
+    """Helper to handle indices and logical indices of NaNs.
+
+    Input:
+        - y, 1d numpy array with possible NaNs
+    Output:
+        - nans, logical indices of NaNs
+        - index, a function, with signature indices= index(logical_indices),
+          to convert logical indices of NaNs to 'equivalent' indices
+    Example:
+        >>> # linear interpolation of NaNs
+        >>> nans, x= nan_helper(y)
+        >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+    """
+
+    return np.isnan(y), lambda z: z.nonzero()[0]
+
 @app.route('/name', methods=['POST'])
 def name():
     fn_ib = 'IBTrACS.ALL.v04r00.nc'
@@ -129,23 +146,38 @@ def name():
     names = ds_ib['name'].data.astype('str')
     basins = ds_ib['basin'][:, 0].data.astype('str')
     r_name = request.form['name'].upper()
+    time = ds_ib['time'].load()
+    null_mask = ~pd.isnull(time.data)
+    dts = [datetime.datetime.utcfromtimestamp(int(x)/1e9) for x in np.array(time.data[null_mask])]
+    dt = np.full(time.shape, datetime.datetime(2100, 1, 1))
+    dt[null_mask] = dts
 
     if np.any(names == r_name):
-        idxs = names == r_name
-
-        if len(idxs) >= 0:
+        idxs = np.logical_and(names == r_name, dt[:, 0] >= datetime.datetime(1930, 1, 1)) 
+        vmax_tc = ds_ib['wmo_wind'][idxs, :].load().data
+        valid_mask = ~np.all(np.isnan(vmax_tc), axis = 1)
+        if np.sum(idxs) > 0:
+            idxs = np.argwhere(idxs).flatten()[valid_mask]
+            print(idxs)
             lon_tc = ds_ib['lon'][idxs, :].load().data
             lat_tc = ds_ib['lat'][idxs, :].load().data
             basin_tc = basins[idxs]
             tc_names = names[idxs]
-            vmax_tc = ds_ib['usa_wind'][idxs, :].load().data
-            lon_syn_tc =np.array([])
+            vmax_tc = ds_ib['wmo_wind'][idxs, :].load().data
+            for jdx in range(len(idxs)):
+                if np.any(np.isnan(vmax_tc[jdx, :])):
+                    nans, x = nan_helper(vmax_tc[jdx, :])
+                    vmax_tc[jdx, nans] = np.interp(x(nans), x(~nans), vmax_tc[jdx, ~nans])
+                    #vmax_tc[jdx, np.isnan(lon_tc[jdx, :])] = np.nan
+            print(basin_tc)
+            lon_syn_tc = np.array([])
             lat_syn_tc = np.array([])
             basin_syn_t = np.array([])
             vmax_syn_tc = np.array([]) 
             fig = plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
-                  lon_syn_tc, lat_syn_tc, basin_syn_t, vmax_syn_tc,r_name)
-
+                              lon_syn_tc, lat_syn_tc, basin_syn_t, vmax_syn_tc,r_name)
+        else:
+            return render_template('result.html', img_data='', h_name = 'No hurricanes found :(')
 
         # Save it to a temporary buffer.
         buf = BytesIO()
@@ -175,9 +207,9 @@ def date():
     #ds_ipsl = xr.open_dataset('/home/clee/test/open_house/IPSL-CM6A-LR_openhouse.nc')
     ds_cesm = xr.open_dataset('/home/clee/test/open_house/CESM2_openhouse.nc')
 
-    # For synthetic tracks, select a random year between 1951 and 2100
+    # For synthetic tracks, select a random year between [year - 1, year + 1]
     # Use the month and day of the actual birthday.
-    year_syn = np.random.randint(1951, 2101)
+    year_syn = np.random.randint(r_date.year-1, r_date.year+1)
     cesm_mask = np.logical_and(ds_cesm['year'][0, :].data == year_syn,
                                ds_cesm['month'][0, :].data == r_date.month,
                                ds_cesm['day'][0, :].data == r_date.day)
@@ -206,7 +238,7 @@ def date():
         lat_tc = ds_ib['lat'][idxs, :].load().data
         basin_tc = basins[idxs]
         tc_names = names[idxs]
-        vmax_tc = ds_ib['usa_wind'][idxs, :].load().data
+        vmax_tc = ds_ib['wmo_wind'][idxs, :].load().data
     else:
         lon_tc = np.array([])
         lat_tc = np.array([])
