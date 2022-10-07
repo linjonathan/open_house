@@ -74,7 +74,7 @@ def plot_tracks(lon_tc, lat_tc, basin_tc, tc_names, vmax_tc,
         line = ax.add_collection(lc)
         lat_offset = -5
         if lat_tc[k, 0] < 0:
-            lat_offset = 4
+            lat_offset = 2
         ax.text(lon_tc_b[k, 0], lat_tc[k, 0] + lat_offset, tc_names[k],
                 {'size': 13, 'ha': 'left', 'backgroundcolor': [0.5, 0.5, 0.5, 0.8]})
     ax.set_title('Historical Tropical Cyclones: '+title_name)
